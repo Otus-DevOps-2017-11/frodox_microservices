@@ -132,6 +132,8 @@ docker run -d --network=reddit --network-alias=post_db --network-alias=comment_d
 ## Homework 17 (docker-4)
 
 * Пробуем на вкус none, host, bridge драйвера сети
+* Установлен docker-compose
+* Написан docker-compose.yml для сборки и запуска микросервисного приложения
 
 Выводы команд
 
@@ -147,3 +149,10 @@ docker-machine ssh docker-host ifconfig
 т.к. они пытаются присоединиться к одному и тому же порту в одном и том же сетевом пространстве имён.
 
 
+```
+# старт сервисов
+docker-compose up -d
+
+# стоп сервисов
+docker-compose down
+```
