@@ -87,6 +87,11 @@ docker run --rm --pid host -it tehbilly/htop
 
 ## Homework 16 (docker-3)
 
+* Проба создания Dockerfile для микросервисного приложения
+* Пробы по оптимизации размера/создания Docker образов
+* Запуск микросервисного приложения вручную
+* Использование volume для перманентного сохранения данных
+
 Для начала активируем работу с `docker-host`, по аналогии с 15-м уроком.
 
 Сборка образов
@@ -112,3 +117,13 @@ docker run -d --network=reddit -p 9292:9292 frodox/ui:1.0
 
 Создали bridge сеть для контейнеров и запустили их в ней. Тест доступен по
 `http://<docker-host-external-ip>:9292/`
+
+Создание volume-а `docker build -t frodox/ui:1.0 ./ui/`
+
+Запуск контейнера с mongoDB с подключённым volume:
+
+```
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db -v reddit_db:/data/db mongo:latest
+```
+
+После перезагрузки контейнеров изменения (нвоые посты) остаются. Чудо!
