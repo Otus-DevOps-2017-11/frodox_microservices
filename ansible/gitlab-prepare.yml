@@ -1,0 +1,53 @@
+- hosts: gitlab-ci
+  become: yes
+  vars:
+    gitlab_config_dir: /srv/gitlab
+  tasks:
+    - name: Add GPG key
+      shell:
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+
+    - name: Add docker ubuntu repo
+      shell:
+        add-apt-repository "deb https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+
+    - name: Install docker-compose
+      apt:
+        name: docker-compose
+        state: present
+        update_cache: yes
+        install_recommends: no
+
+    - name: Create gitlab dirs
+      file:
+        path: "{{ item }}"
+        state: directory
+      with_items:
+        - "{{ gitlab_config_dir }}/config"
+        - "{{ gitlab_config_dir }}/data"
+        - "{{ gitlab_config_dir }}/logs"
+
+    - name: Create GitLab docker-compose.yml
+      copy:
+        dest: "{{ gitlab_config_dir }}/docker-compose.yml"
+        content: |
+          web:
+            image: 'gitlab/gitlab-ce:latest'
+            restart: always
+            hostname: 'gitlab.example.com'
+            environment:
+              GITLAB_OMNIBUS_CONFIG: |
+                external_url 'http://{{ ansible_host }}'
+            ports:
+              - '80:80'
+              - '443:443'
+              - '2222:22'
+            volumes:
+              - '/srv/gitlab/config:/etc/gitlab'
+              - '/srv/gitlab/logs:/var/log/gitlab'
+              - '/srv/gitlab/data:/var/opt/gitlab'
+
+    - name: Start GitLab
+      shell: docker-compose up -d
+      args:
+        chdir: "{{ gitlab_config_dir }}"
