@@ -127,3 +127,32 @@ docker run -d --network=reddit --network-alias=post_db --network-alias=comment_d
 ```
 
 После перезагрузки контейнеров изменения (нвоые посты) остаются. Чудо!
+
+
+## Homework 17 (docker-4)
+
+* Пробуем на вкус драйвера сети: none, host, bridge 
+* Установлен docker-compose
+* Написан docker-compose.yml для сборки и запуска микросервисного приложения
+
+Выводы команд
+
+```
+docker exec -ti net_test ifconfig
+docker-machine ssh docker-host ifconfig
+```
+
+совпадают, по понятным причинам - единый сетевой namespace:)
+
+Одновременный запуск нескольких nginx контейнеров выглядит как успешный, однако
+все последующие контейнеры тут же завершаются с ошибкой что Adress already in use,
+т.к. они пытаются присоединиться к одному и тому же порту в одном и том же сетевом пространстве имён.
+
+
+```
+# старт сервисов
+docker-compose up -d
+
+# стоп сервисов
+docker-compose down
+```
