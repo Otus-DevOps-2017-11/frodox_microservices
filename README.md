@@ -156,3 +156,48 @@ docker-compose up -d
 # стоп сервисов
 docker-compose down
 ```
+
+## Homework 19 (GitLab CI)
+
+Основные цели занятия:
+
+* подготовка/запуск инсталяции GitLab omnibus
+* настройка репозитория с приложением на запуск тестов
+* настройка `.gitlab-ci.yml` для начала процесса непрерывной интеграции
+
+---
+
+Создание машины в GCloud:
+
+```
+~/opt/docker-machine-0.13 create --driver google \
+    --google-project $(cat gcp.id) \
+    --google-zone europe-west1-b \
+    --google-machine-type n1-standard-1 --google-disk-size 100 \
+    --google-machine-image \
+    $(gcloud compute images list --filter ubuntu-1604-lts --uri) \
+    --google-tags 'default-allow-ssh,http-server,https-server' \
+    gitlab-ci
+
+eval $(~/opt/docker-machine-0.13 env gitlab-ci)
+```
+
+Конфигурирование и запуск GitLab
+```
+cd ansible
+ansible-playbook gitlab-prepare.yml
+```
+Ждём пару минут. Как GitLab становится доступен по external IP нашей VM, 
+логинимся, создаём проект, получаем токен CI/CD, запускаем и регистрируем раннера
+
+```
+docker run -d --name gitlab-runner --restart always \
+-v /srv/gitlab-runner/config:/etc/gitlab-runner \
+-v /var/run/docker.sock:/var/run/docker.sock \
+gitlab/gitlab-runner:latest
+
+docker exec -it gitlab-runner gitlab-runner register
+
+```
+
+
