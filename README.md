@@ -200,4 +200,10 @@ docker exec -it gitlab-runner gitlab-runner register
 
 ```
 
+## Homework 20 (GitLab CI)
+
+В ходе домашнего задания:
+
+* расширен существующий pipeline
+* Добавлены динамические окружения, stage, prod
 
