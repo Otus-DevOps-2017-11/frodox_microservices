@@ -207,3 +207,32 @@ docker exec -it gitlab-runner gitlab-runner register
 * расширен существующий pipeline
 * Добавлены динамические окружения, stage, prod
 
+## Homework 21 (Prometheus)
+
+* Подготовка окружения
+
+```
+# firewall
+gcloud compute firewall-rules create prometheus-default --allow tcp:9090
+gcloud compute firewall-rules create puma-default --allow tcp:9292
+
+# create docker VM
+export GOOGLE_PROJECT=$(cat gcp.id)
+~/opt/docker-machine-0.13 create --driver google \
+    --google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
+    --google-machine-type n1-standard-1 \
+    vm1
+
+# configure local env
+eval $(~/opt/docker-machine-0.13 env vm1)
+
+docker run --rm -p 9090:9090 -d --name prometheus  prom/prometheus
+```
+
+* Сборка докера с Prometheus
+
+```
+cd monitoring/prometheus
+export USER_NAME=frodox
+docker build -t $USER_NAME/prometheus .
+```
