@@ -52,6 +52,22 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention=1d'
 
+  node-exporter:
+    image: prom/node-exporter:v0.15.2
+    user: root
+    networks:
+      back_net:
+      front_net:
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points="^/(sys|proc|dev|host|etc)($$|/)"'
+
+
 
 volumes:
   post_db:

@@ -237,6 +237,17 @@ export USER_NAME=frodox
 docker build -t $USER_NAME/prometheus .
 ```
 
+* Сборка всех сервисов
+
+```
+for i in ui post-py comment; 
+do 
+    pushd src/$i
+    bash docker_build.sh
+    popd
+done
+```
+
 * Запуск всех сервисов
 
 ```
@@ -244,3 +255,23 @@ cd docker/
 cp reddit.env .env
 docker-compose up -d
 ```
+
+* Пушим собранные образы в docker.io
+
+```
+docker login
+...
+for i in ui comment post prometheus;
+do
+    echo -e "\nPushing $USER_NAME/$i\n"
+    docker push $USER_NAME/$i || echo "ERRORRRRR" >&2
+done
+```
+
+`docker-machine rm vm1`
+
+* Ссылки на образы:
+  * https://hub.docker.com/r/frodox/prometheus/
+  * https://hub.docker.com/r/frodox/post/
+  * https://hub.docker.com/r/frodox/ui/
+  * https://hub.docker.com/r/frodox/comment/
