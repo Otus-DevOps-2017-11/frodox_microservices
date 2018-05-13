@@ -38,7 +38,7 @@ services:
           - comment
 
   prometheus:
-    image: ${USERNAME}/prometheus
+    image: ${USER_NAME}/prometheus
     restart: always
     networks:
       back_net:
@@ -51,7 +51,7 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention=1d'
-    
+
 
 volumes:
   post_db:

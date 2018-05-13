@@ -229,10 +229,18 @@ eval $(~/opt/docker-machine-0.13 env vm1)
 docker run --rm -p 9090:9090 -d --name prometheus  prom/prometheus
 ```
 
-* Сборка докера с Prometheus
+* Сборка докера с Prometheus с нашим конфигом
 
 ```
 cd monitoring/prometheus
 export USER_NAME=frodox
 docker build -t $USER_NAME/prometheus .
+```
+
+* Запуск всех сервисов
+
+```
+cd docker/
+cp reddit.env .env
+docker-compose up -d
 ```
