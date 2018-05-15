@@ -286,6 +286,7 @@ done
 ```
 # firewall
 gcloud compute firewall-rules create cadvisor-default --allow tcp:8080
+gcloud compute firewall-rules create grafana-default --allow tcp:3000
 
 # create docker VM
 export GOOGLE_PROJECT=$(cat gcp.id)
