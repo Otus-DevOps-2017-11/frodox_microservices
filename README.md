@@ -336,6 +336,14 @@ done
 
 ## Homework #25 (Logging & Tracing)
 
+В ходе домашней работы:
+* Настроен сбор логов
+* Работа со структурированными логами
+* Работа с неструктурированными логами
+* Распределённая трасировка приложений
+
+Ход работ:
+
 * Создание новой тачки и открытие доп.портов
 ```
 export GOOGLE_PROJECT=$(cat gcp.id)
@@ -349,6 +357,9 @@ export GOOGLE_PROJECT=$(cat gcp.id)
     logging
 
 eval $(~/opt/docker-machine-0.13 env vm2)
+
+gcloud compute firewall-rules create zipkin-default --allow tcp:9411
+gcloud compute firewall-rules create alertmanager-default --allow tcp:9411
 ```
 
 * Обновлён исходный код в каталоге `/src`
@@ -362,7 +373,4 @@ do
 done
 wait
 ```
-
-
-
 
