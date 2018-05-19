@@ -243,7 +243,7 @@ docker build -t $USER_NAME/prometheus .
 for i in ui post-py comment; 
 do
     pushd src/$i
-    bash ./docker_build.sh & || echo "ERROR" >&2
+    (bash ./docker_build.sh || echo "ERROR" >&2) &
     popd
 done
 wait
@@ -306,7 +306,7 @@ eval $(~/opt/docker-machine-0.13 env vm1)
 for i in ui post-py comment; 
 do
     pushd src/$i
-    bash ./docker_build.sh & || echo "ERROR" >&2
+    (bash ./docker_build.sh || echo "ERROR" >&2) &
     popd
 done
 wait
@@ -342,6 +342,7 @@ export GOOGLE_PROJECT=$(cat gcp.id)
 ~/opt/docker-machine-0.13 create --driver google \
     --google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
     --google-machine-type n1-standard-1 \
+    --google-open-port 5000/tcp \
     --google-open-port 5601/tcp \
     --google-open-port 9292/tcp \
     --google-open-port 9411/tcp \
@@ -356,10 +357,12 @@ eval $(~/opt/docker-machine-0.13 env vm2)
 for i in ui post-py comment; 
 do
     pushd src/$i
-    bash ./docker_build.sh & || echo "ERROR" >&2
+    (bash ./docker_build.sh || echo "ERROR building $i" >&2) &
     popd
 done
 wait
 ```
+
+
 
 
