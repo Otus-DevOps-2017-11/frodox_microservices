@@ -287,6 +287,7 @@ done
 # firewall
 gcloud compute firewall-rules create cadvisor-default --allow tcp:8080
 gcloud compute firewall-rules create grafana-default --allow tcp:3000
+gcloud compute firewall-rules create alertmanager-default --allow tcp:9093
 
 # create docker VM
 export GOOGLE_PROJECT=$(cat gcp.id)
@@ -317,3 +318,17 @@ wait
 docker-compose up -d
 docker-compose -f docker-compose-monitoring.yml up -d
 ```
+
+* Работа над графаной и алертмэнеджером
+
+* Отправка всех образов в докерхаб
+
+```
+for i in ui comment post prometheus alertmanager;
+do
+    echo -e "\nPushing $USER_NAME/$i\n"
+    docker push $USER_NAME/$i || echo "ERRORRRRR" >&2
+done
+```
+
+Ссылка: https://hub.docker.com/u/frodox/
