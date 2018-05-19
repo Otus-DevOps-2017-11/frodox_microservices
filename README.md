@@ -302,5 +302,18 @@ eval $(~/opt/docker-machine-0.13 env vm1)
 * Билдим образы всех приложений
 
 ```
+for i in ui post-py comment; 
+do
+    pushd src/$i
+    bash ./docker_build.sh & || echo "ERROR" >&2
+    popd
+done
+wait
+```
 
+* Стартуем
+
+```
+docker-compose up -d
+docker-compose -f docker-compose-monitoring.yml up -d
 ```
