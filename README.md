@@ -74,7 +74,7 @@ docker push frodox/otus-reddit:1.0
 
 
 ### Задание со `*`:
-Сравнить вывод 
+Сравнить вывод
 
 ```
 docker run --rm -it tehbilly/htop
@@ -131,7 +131,7 @@ docker run -d --network=reddit --network-alias=post_db --network-alias=comment_d
 
 ## Homework 17 (docker-4)
 
-* Пробуем на вкус драйвера сети: none, host, bridge 
+* Пробуем на вкус драйвера сети: none, host, bridge
 * Установлен docker-compose
 * Написан docker-compose.yml для сборки и запуска микросервисного приложения
 
@@ -187,7 +187,7 @@ eval $(~/opt/docker-machine-0.13 env gitlab-ci)
 cd ansible
 ansible-playbook gitlab-prepare.yml
 ```
-Ждём пару минут. Как GitLab становится доступен по external IP нашей VM, 
+Ждём пару минут. Как GitLab становится доступен по external IP нашей VM,
 логинимся, создаём проект, получаем токен CI/CD, запускаем и регистрируем раннера
 
 ```
@@ -240,7 +240,7 @@ docker build -t $USER_NAME/prometheus .
 * Сборка всех сервисов
 
 ```
-for i in ui post-py comment; 
+for i in ui post-py comment;
 do
     pushd src/$i
     (bash ./docker_build.sh || echo "ERROR" >&2) &
@@ -303,7 +303,7 @@ eval $(~/opt/docker-machine-0.13 env vm1)
 * Билдим образы всех приложений
 
 ```
-for i in ui post-py comment; 
+for i in ui post-py comment;
 do
     pushd src/$i
     (bash ./docker_build.sh || echo "ERROR" >&2) &
@@ -365,7 +365,7 @@ gcloud compute firewall-rules create alertmanager-default --allow tcp:9411
 * Обновлён исходный код в каталоге `/src`
 * Сборка новых версий всех образов:
 ```
-for i in ui post-py comment; 
+for i in ui post-py comment;
 do
     pushd src/$i
     (bash ./docker_build.sh || echo "ERROR building $i" >&2) &
@@ -374,3 +374,165 @@ done
 wait
 ```
 
+## Homework #27 (Swarm-1)
+
+* Создаём машины для работы (мастер и воркеры)
+
+```
+GCP_ID=$(cat gcp.id)
+for m in master-1 worker-1 worker-2;
+do
+    docker-machine create --driver google \
+    --google-project $GCP_ID \
+    --google-zone europe-west1-b \
+    --google-machine-type g1-small \
+    --google-machine-image $(gcloud compute images list --filter ubuntu-1604-lts --uri) \
+    $m
+done
+eval $(docker-machine env master-1)
+```
+
+* Инициалиазция swarm-кластера
+
+```
+docker-machine ssh master-1
+sudo docker swarm init
+```
+
+Получаем команду для подключения воркеров:
+```
+docker swarm join --token SWMTKN-1-3k3gaf7p52vqld8zqvnfm53pual9q81cec1kg00kll3kw97inz-0um7ij57wpv1jbshlzg3qnzdz 10.132.0.2:2377
+```
+Подключаем обоих.
+
+При необходимости, для подключения менеджера достаточно выполнить: `docker swarm join-token manager`
+
+* Создаём docker-compose-swarm.yml для Stack
+* Запускаем Stack
+```
+cd docker
+docker stack deploy --compose-file=<(docker-compose -f docker-compose-swarm.yml config 2>/dev/null) DEV
+```
+
+* Смотрим его состояние
+```
+docker stack services DEV
+```
+
+Инфа по лейблам (для ограничения размещения)
+* `node.*` --- встроенные label для ноды
+* `node.labels*` --- заданные вручную label для ноды
+* `engine.labels.*` --- label-ы engine
+
+* Добавляем label к мастер-ноде
+```
+docker node update --label-add reliability=high master-1
+```
+
+* Посмотреть label всех нод (пока только так)
+```
+docker node ls -q | xargs docker node inspect  -f '{{ .ID }} [{{ .Description.Hostname }}]: {{ .Spec.Labels }}'
+```
+
+* Поднимаем мониторинг:
+```
+docker stack deploy --compose-file=<(docker-compose -f docker-compose-monitoring.yml config 2>/dev/null) DEV
+```
+
+* Добавляем ещё одного воркера:
+```
+docker-machine create --driver google \
+    --google-project $GCP_ID \
+    --google-zone europe-west1-b \
+    --google-machine-type g1-small \
+    --google-machine-image $(gcloud compute images list --filter ubuntu-1604-lts --uri) \
+    worker-3
+
+docker-machine ssh worker-3
+```
+
+Смотрим контейнеры до добавления воркера:
+```
+$ docker stack ps DEV
+
+lhekvyex0g0h  DEV_node-exporter.wtg17ff84v6k38h63l8q2rwsh  prom/node-exporter:v0.15.2  worker-2  Running
+3trjbxcl1pxw  DEV_node-exporter.pdk3l24byngvyqdshvyobu35x  prom/node-exporter:v0.15.2  worker-1  Running
+oakbqxk4p8go  DEV_node-exporter.kdndoqmjq4ovgyen7bjgqkh5n  prom/node-exporter:v0.15.2  master-1  Running
+53yduslwbhya  DEV_cadvisor.1                               google/cadvisor:v0.29.0     worker-1  Running
+4705deb9uzp9  DEV_alertmanager.1                           frodox/alertmanager         master-1  Running
+sgo6gi2ldpq4  DEV_prometheus.1                             frodox/prometheus           master-1  Running
+gl2qvv0fkrs6  DEV_grafana.1                                grafana/grafana:5.0.0       worker-2  Running
+8v23z8uz47yj  DEV_post.1                                   frodox/post:latest          worker-2  Running
+i89r1txxmyrd  DEV_mongo.1                                  mongo:3.2                   master-1  Running
+3mom8norwgph  DEV_comment.1                                frodox/comment:latest       worker-2  Running
+t7194nkrid2e  DEV_ui.1                                     frodox/ui:latest            worker-2  Running
+p66a0kf53f9x  DEV_post.2                                   frodox/post:latest          worker-1  Running
+2orf6j5co7tv  DEV_comment.2                                frodox/comment:latest       worker-1  Running
+8x1xybteqx8o  DEV_ui.2                                     frodox/ui:latest            worker-1  Running
+```
+
+* Добавляем ещё одного worker
+```
+sudo docker swarm join --token SWMTKN-1-3k3gaf7p52vqld8zqvnfm53pual9q81cec1kg00kll3kw97inz-0um7ij57wpv1jbshlzg3qnzdz 10.132.0.2:2377
+```
+
+Текущая картина:
+```
+➜  docker (swarm-1) docker stack ps DEV
+lhekvyex0g0h  DEV_node-exporter.wtg17ff84v6k38h63l8q2rwsh  prom/node-exporter:v0.15.2  worker-2
+3trjbxcl1pxw  DEV_node-exporter.pdk3l24byngvyqdshvyobu35x  prom/node-exporter:v0.15.2  worker-1
+oakbqxk4p8go  DEV_node-exporter.kdndoqmjq4ovgyen7bjgqkh5n  prom/node-exporter:v0.15.2  master-1
+rtwd48j46lc5  DEV_node-exporter.09kmoxlvtrhzx75c3719plobm  prom/node-exporter:v0.15.2  worker-3
+53yduslwbhya  DEV_cadvisor.1                               google/cadvisor:v0.29.0     worker-1
+4705deb9uzp9  DEV_alertmanager.1                           frodox/alertmanager         master-1
+sgo6gi2ldpq4  DEV_prometheus.1                             frodox/prometheus           master-1
+gl2qvv0fkrs6  DEV_grafana.1                                grafana/grafana:5.0.0       worker-3
+8v23z8uz47yj  DEV_post.1                                   frodox/post:latest          worker-2
+i89r1txxmyrd  DEV_mongo.1                                  mongo:3.2                   master-1
+3mom8norwgph  DEV_comment.1                                frodox/comment:latest       worker-3
+t7194nkrid2e  DEV_ui.1                                     frodox/ui:latest            worker-2
+p66a0kf53f9x  DEV_post.2                                   frodox/post:latest          worker-1
+2orf6j5co7tv  DEV_comment.2                                frodox/comment:latest       worker-1
+8x1xybteqx8o  DEV_ui.2                                     frodox/ui:latest            worker-3
+➜  docker (swarm-1)
+```
+
+т.е. переехали сервисы:
+* node_exporter
+* grafana
+* comment
+* ui
+
+Увеличиваем в конфиге число реплик до трёх, запускаем, смотрим:
+```
+➜  docker (swarm-1) docker stack ps DEV
+lhekvyex0g0h  DEV_node-exporter.wtg17ff84v6k38h63l8q2rwsh  prom/node-exporter:v0.15.2  worker-2 
+3trjbxcl1pxw  DEV_node-exporter.pdk3l24byngvyqdshvyobu35x  prom/node-exporter:v0.15.2  worker-1 
+oakbqxk4p8go  DEV_node-exporter.kdndoqmjq4ovgyen7bjgqkh5n  prom/node-exporter:v0.15.2  master-1 
+rtwd48j46lc5  DEV_node-exporter.09kmoxlvtrhzx75c3719plobm  prom/node-exporter:v0.15.2  worker-3 
+53yduslwbhya  DEV_cadvisor.1                               google/cadvisor:v0.29.0     worker-1 
+4705deb9uzp9  DEV_alertmanager.1                           frodox/alertmanager         master-1 
+sgo6gi2ldpq4  DEV_prometheus.1                             frodox/prometheus           master-1 
+gl2qvv0fkrs6  DEV_grafana.1                                grafana/grafana:5.0.0       worker-3 
+8v23z8uz47yj  DEV_post.1                                   frodox/post:latest          worker-2 
+i89r1txxmyrd  DEV_mongo.1                                  mongo:3.2                   master-1 
+3mom8norwgph  DEV_comment.1                                frodox/comment:latest       worker-3 
+t7194nkrid2e  DEV_ui.1                                     frodox/ui:latest            worker-2 
+p66a0kf53f9x  DEV_post.2                                   frodox/post:latest          worker-1 
+2orf6j5co7tv  DEV_comment.2                                frodox/comment:latest       worker-1 
+8x1xybteqx8o  DEV_ui.2                                     frodox/ui:latest            worker-3 
+vuiand8p6h98  DEV_post.3                                   frodox/post:latest          worker-3 
+u1jncjfcam72  DEV_comment.3                                frodox/comment:latest       worker-2 
+3cgwagw5eie0  DEV_ui.3                                     frodox/ui:latest            worker-1 
+```
+
+теперь на третем воркере добавился сервис `post`. Все предыдущие продолжают быть запущены.
+Таким образом, при увеличении количества реплик новые контейнеры с сервисом занимабт тех
+воркеров, где они ещё не запущены (экземпляр этого сервиса). Уже запущенные экземпляры остаются там,
+где и были запущены.
+
+
+* Запуск приложений вместе с мониторингом:
+```
+docker stack deploy --compose-file=<(docker-compose -f docker-compose-swarm.yml -f docker-compose.monitoring.yml config 2>/dev/null) DEV
+```
