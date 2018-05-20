@@ -536,3 +536,240 @@ u1jncjfcam72  DEV_comment.3                                frodox/comment:latest
 ```
 docker stack deploy --compose-file=<(docker-compose -f docker-compose-swarm.yml -f docker-compose.monitoring.yml config 2>/dev/null) DEV
 ```
+
+## Homework #28 (Kubernetes. The Hard Way)
+
+[Стартуем туториал](https://github.com/kelseyhightower/kubernetes-the-hard-way) . Labs
+
+### Подготовка
+
+* ansible setup GCE ([based on](http://docs.ansible.com/ansible/devel/scenario_guides/guide_gce.html))
+** [Создаём сервисную учётку GCE](https://console.cloud.google.com/iam-admin/serviceaccounts/project?project=docker-196320&authuser=1)
+** Качаем от учётки JSON ключ доступа. Почту
+** Ставим зависимости
+```
+# pip install apache-libcloud
+
+export GCE_INI_PATH=$(pwd)/kubernetes/ansible/inventory/gce.ini
+```
+** в каталоге ansible/inventory используем gce.ini/py из офф.репы ansible
+** фиксим поля `gce_*` в файле `gce.ini`
+
+* установка и логин GCloud SDK, tmux
+```
+# set default region
+gcloud config set compute/region europe-west2
+```
+* установка cfssl, cfssljson
+* установка kubectl
+
+#### Настройка GCloud окружения
+
+* Настройка сети и firewall
+```
+# VPC и подсеть
+gcloud compute networks create kubernetes-the-hard-way --subnet-mode custom
+gcloud compute networks subnets create kubernetes \
+  --network kubernetes-the-hard-way \
+  --range 10.240.0.0/24
+
+# firewall
+## internal
+gcloud compute networks subnets create kubernetes \
+  --network kubernetes-the-hard-way \
+  --range 10.240.0.0/24
+
+## external
+gcloud compute networks subnets create kubernetes \
+  --network kubernetes-the-hard-way \
+  --range 10.240.0.0/24
+
+## show rules
+gcloud compute firewall-rules list --filter="network:kubernetes-the-hard-way"
+```
+
+* Создаём статический внешний IP для LB
+```
+gcloud compute addresses create kubernetes-the-hard-way \
+  --region $(gcloud config get-value compute/region)
+
+# убеждаемся что всё ок
+gcloud compute addresses list --filter="name=('kubernetes-the-hard-way')"
+```
+
+* Создание 3 compute instances для k8s контроллеров
+```
+# выбираем зону europe-west2-c (21)
+for i in 0 1 2; do
+  gcloud compute instances create controller-${i} \
+    --async \
+    --boot-disk-size 200GB \
+    --can-ip-forward \
+    --image-family ubuntu-1804-lts \
+    --image-project ubuntu-os-cloud \
+    --machine-type n1-standard-1 \
+    --private-network-ip 10.240.0.1${i} \
+    --scopes compute-rw,storage-ro,service-management,service-control,logging-write,monitoring \
+    --subnet kubernetes \
+    --tags kubernetes-the-hard-way,controller
+done
+```
+
+* Создаём 3 инстанса для воркеров
+```
+for i in 0 1 2; do
+  gcloud compute instances create worker-${i} \
+    --async \
+    --boot-disk-size 200GB \
+    --can-ip-forward \
+    --image-family ubuntu-1804-lts \
+    --image-project ubuntu-os-cloud \
+    --machine-type n1-standard-1 \
+    --metadata pod-cidr=10.200.${i}.0/24 \
+    --private-network-ip 10.240.0.2${i} \
+    --scopes compute-rw,storage-ro,service-management,service-control,logging-write,monitoring \
+    --subnet kubernetes \
+    --tags kubernetes-the-hard-way,worker \
+    --zone europe-west2-c
+done
+
+# проверяем результат
+gcloud compute instances list
+```
+
+* Настройка SSH-доступа
+
+```
+gcloud compute ssh controller-0
+```
+
+#### Создание CA и генерация TLS сертификатов
+
+* Создание CA
+```
+cfssl gencert -initca ca-csr.json | cfssljson -bare ca
+> ca-key.pem
+> ca.pem
+```
+
+* Создание клиентских и серверных сертификатов
+** `admin` клиентский сертификат
+```
+cfssl gencert \
+  -ca=ca.pem \
+  -ca-key=ca-key.pem \
+  -config=ca-config.json \
+  -profile=kubernetes \
+  admin-csr.json | cfssljson -bare admin
+
+> admin-key.pem
+> admin.pem
+```
+
+** `kubelet` клиентский сертификат и приватный ключ
+
+Result: `worker-{0,2}.pem`, `worker-{0,2}-key.pem`
+
+** `kube-controller-manager` клиентский сертификат и приватный ключ
+
+Result: `kube-controller-manager.pem`, `kube-controller-manager-key.pem`
+
+** `kube-proxy` клиентский сертификат и приватный ключ
+
+Result: `kube-proxy.pem`, `kube-proxy-key.pem`
+
+** `kube-scheduler` клиентский сертификат и приватный ключ
+
+Result: `kube-scheduler.pem`, `kube-scheduler-key.pem`
+
+** `kube-api-server` клиентский сертификат и приватный ключ
+
+Result: `kubernetes.pem`, `kubernetes-key.pem`
+
+** `service-account` клиентский сертификат и приватный ключ
+
+Result: `service-account.pem`, `service-account-key.pem`
+
+* Распространяем ключи по соответствующим нодам:
+
+```
+# по воркерам
+for instance in worker-0 worker-1 worker-2; do
+  gcloud compute scp ca.pem ${instance}-key.pem ${instance}.pem ${instance}:~/
+done
+
+# по контроллерам
+for instance in controller-0 controller-1 controller-2; do
+  gcloud compute scp ca.pem ca-key.pem kubernetes-key.pem kubernetes.pem \
+    service-account-key.pem service-account.pem ${instance}:~/
+done
+```
+
+#### Создание kubernetes конфигов для аутентификации
+
+* Конфиги для воркеров `worker-{0,2}.kubeconfig`
+* Конфиг для `kube-proxy` --- `kube-proxy.kubeconfig`
+* Конфиг для `kube-controller-manager` --- `kube-controller-manager.kubeconfig`
+* Конфиг для `kube-scheduler` --- `kube-scheduler.kubeconfig`
+* Конфиг для user `admin` --- `admin..kubeconfig`
+* Распространяем конфиги
+```
+# для воркеров
+for instance in worker-0 worker-1 worker-2; do
+  gcloud compute scp ${instance}.kubeconfig kube-proxy.kubeconfig ${instance}:~/
+done
+
+# для контроллеров
+for instance in controller-0 controller-1 controller-2; do
+  gcloud compute scp admin.kubeconfig kube-controller-manager.kubeconfig kube-scheduler.kubeconfig ${instance}:~/
+done
+```
+
+#### Создание конфига и ключа для шифрования данных
+
+* Создание ключа шифрования из `/dev/urandom`
+* Создание конфига шифрования
+* Распространяем конфиг по контроллерам
+```
+for instance in controller-0 controller-1 controller-2; do
+  gcloud compute scp encryption-config.yaml ${instance}:~/
+done
+```
+
+### Поднятие кластера etcd
+
+```
+cd ansible
+ansible-playbook k8s-thw-etcd.yml
+```
+
+### Bootstrapping the Kubernetes Control Plane
+
+```
+cd ansible
+ansible-playbook -v k8s-thw-control-plane.yml
+```
+
+* Вручную настраиваем k8s FrontEnd LoadBalancer с хоста
+* Проверка, что всё OK
+```
+$ KUBERNETES_PUBLIC_ADDRESS=$(gcloud compute addresses describe kubernetes-the-hard-way \
+  --region $(gcloud config get-value compute/region) \
+  --format 'value(address)')
+
+$ curl --cacert ../kubernetes_the_hard_way/certs/ca.em https://${KUBERNETES_PUBLIC_ADDRESS}:6443/version
+
+{
+  "major": "1",
+  "minor": "10",
+  "gitVersion": "v1.10.2",
+  "gitCommit": "81753b10df112992bf51bbc2c2f85208aad78335",
+  "gitTreeState": "clean",
+  "buildDate": "2018-04-27T09:10:24Z",
+  "goVersion": "go1.9.3",
+  "compiler": "gc",
+  "platform": "linux/amd64"
+}
+```
+
+### Bootstrapping the Kubernetes Worker Nodes

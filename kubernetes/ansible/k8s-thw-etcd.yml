@@ -1,0 +1,88 @@
+---
+- name: Bootstrapping the etcd Cluster
+  hosts: controllers
+  vars:
+    etcd_version: v3.3.5
+  tasks:
+    - name: Download binary
+      get_url:
+        url: https://github.com/coreos/etcd/releases/download/{{ etcd_version }}/etcd-{{ etcd_version }}-linux-amd64.tar.gz
+        dest: /tmp/etcd.tar.gz
+
+    - name: Unpack archive
+      unarchive:
+        src: /tmp/etcd.tar.gz
+        dest: /tmp
+        remote_src: true
+
+    - name: Copy binaries
+      copy:
+        src: /tmp/etcd-{{ etcd_version }}-linux-amd64/{{ item }}
+        dest: /usr/local/bin/{{ item }}
+        remote_src: true
+        mode: 0755
+      become: true
+      with_items:
+        - etcd
+        - etcdctl
+
+    - name: Get node internal ip
+      uri:
+        url: http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip
+        method: GET
+        return_content: true
+        headers:
+          Metadata-Flavor: "Google"
+      register: gce_ip
+
+    - debug:
+        var: gce_ip
+
+    - set_fact:
+        internal_ip: "{{ gce_ip.content }}"
+
+    - name: Create etcd service
+      template:
+        src: etcd.service.j2
+        dest: /etc/systemd/system/etcd.service
+      become: true
+
+    - name: Create etcd dir
+      file:
+        path: "{{ item }}"
+        state: directory
+      become: true
+      with_items:
+        - /etc/etcd
+        - /var/lib/etcd
+
+    - name: Copy certs
+      copy:
+        src: ../kubernetes_the_hard_way/certs/{{ item }}
+        dest: /etc/etcd/{{ item }}
+      become: true
+      with_items:
+        - kubernetes.pem
+        - kubernetes-key.pem
+        - ca.pem
+
+    - name: start systemd service
+      systemd:
+        name: etcd
+        daemon_reload: true
+        state: started
+        enabled: true
+      become: yes
+
+    - name: Test
+      shell: |
+        ETCDCTL_API=3 etcdctl member list \
+        --endpoints=https://127.0.0.1:2379 \
+        --cacert=/etc/etcd/ca.pem  \
+        --cert=/etc/etcd/kubernetes.pem \
+        --key=/etc/etcd/kubernetes-key.pem
+      become: true
+      register: etcd_test
+
+    - debug:
+        var: etcd_test.stdout_lines

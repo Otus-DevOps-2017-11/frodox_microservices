@@ -1,0 +1,6 @@
+---
+- name: Prepare nodes
+  hosts:
+  tasks:
+    - include: k8s-thw-etcd.yml
+    - include: k8s-thw-control-plane.yml
