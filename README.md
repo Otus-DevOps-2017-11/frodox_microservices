@@ -241,11 +241,12 @@ docker build -t $USER_NAME/prometheus .
 
 ```
 for i in ui post-py comment; 
-do 
+do
     pushd src/$i
-    bash docker_build.sh
+    bash ./docker_build.sh & || echo "ERROR" >&2
     popd
 done
+wait
 ```
 
 * Запуск всех сервисов
@@ -275,3 +276,59 @@ done
   * https://hub.docker.com/r/frodox/post/
   * https://hub.docker.com/r/frodox/ui/
   * https://hub.docker.com/r/frodox/comment/
+
+
+# Homework 23 (Monitoring-2)
+
+
+* Подготовка окружения
+
+```
+# firewall
+gcloud compute firewall-rules create cadvisor-default --allow tcp:8080
+gcloud compute firewall-rules create grafana-default --allow tcp:3000
+gcloud compute firewall-rules create alertmanager-default --allow tcp:9093
+
+# create docker VM
+export GOOGLE_PROJECT=$(cat gcp.id)
+~/opt/docker-machine-0.13 create --driver google \
+    --google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
+    --google-machine-type n1-standard-1 \
+    vm1
+
+# configure local env
+eval $(~/opt/docker-machine-0.13 env vm1)
+```
+
+* Билдим образы всех приложений
+
+```
+for i in ui post-py comment; 
+do
+    pushd src/$i
+    bash ./docker_build.sh & || echo "ERROR" >&2
+    popd
+done
+wait
+```
+
+* Стартуем
+
+```
+docker-compose up -d
+docker-compose -f docker-compose-monitoring.yml up -d
+```
+
+* Работа над графаной и алертмэнеджером
+
+* Отправка всех образов в докерхаб
+
+```
+for i in ui comment post prometheus alertmanager;
+do
+    echo -e "\nPushing $USER_NAME/$i\n"
+    docker push $USER_NAME/$i || echo "ERRORRRRR" >&2
+done
+```
+
+Ссылка: https://hub.docker.com/u/frodox/
