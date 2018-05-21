@@ -1,0 +1,11 @@
+---
+- name: deploying the DNS cluster Add-on
+  hosts: localhost
+  tasks:
+    - name: install addon
+      shell: |
+        kubectl apply -f https://storage.googleapis.com/kubernetes-the-hard-way/kube-dns.yaml
+
+    - name: get pods
+      shell: |
+        kubectl get pods -l k8s-app=kube-dns -n kube-system

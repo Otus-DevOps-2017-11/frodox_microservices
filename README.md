@@ -506,24 +506,24 @@ p66a0kf53f9x  DEV_post.2                                   frodox/post:latest   
 Увеличиваем в конфиге число реплик до трёх, запускаем, смотрим:
 ```
 ➜  docker (swarm-1) docker stack ps DEV
-lhekvyex0g0h  DEV_node-exporter.wtg17ff84v6k38h63l8q2rwsh  prom/node-exporter:v0.15.2  worker-2 
-3trjbxcl1pxw  DEV_node-exporter.pdk3l24byngvyqdshvyobu35x  prom/node-exporter:v0.15.2  worker-1 
-oakbqxk4p8go  DEV_node-exporter.kdndoqmjq4ovgyen7bjgqkh5n  prom/node-exporter:v0.15.2  master-1 
-rtwd48j46lc5  DEV_node-exporter.09kmoxlvtrhzx75c3719plobm  prom/node-exporter:v0.15.2  worker-3 
-53yduslwbhya  DEV_cadvisor.1                               google/cadvisor:v0.29.0     worker-1 
-4705deb9uzp9  DEV_alertmanager.1                           frodox/alertmanager         master-1 
-sgo6gi2ldpq4  DEV_prometheus.1                             frodox/prometheus           master-1 
-gl2qvv0fkrs6  DEV_grafana.1                                grafana/grafana:5.0.0       worker-3 
-8v23z8uz47yj  DEV_post.1                                   frodox/post:latest          worker-2 
-i89r1txxmyrd  DEV_mongo.1                                  mongo:3.2                   master-1 
-3mom8norwgph  DEV_comment.1                                frodox/comment:latest       worker-3 
-t7194nkrid2e  DEV_ui.1                                     frodox/ui:latest            worker-2 
-p66a0kf53f9x  DEV_post.2                                   frodox/post:latest          worker-1 
-2orf6j5co7tv  DEV_comment.2                                frodox/comment:latest       worker-1 
-8x1xybteqx8o  DEV_ui.2                                     frodox/ui:latest            worker-3 
-vuiand8p6h98  DEV_post.3                                   frodox/post:latest          worker-3 
-u1jncjfcam72  DEV_comment.3                                frodox/comment:latest       worker-2 
-3cgwagw5eie0  DEV_ui.3                                     frodox/ui:latest            worker-1 
+lhekvyex0g0h  DEV_node-exporter.wtg17ff84v6k38h63l8q2rwsh  prom/node-exporter:v0.15.2  worker-2
+3trjbxcl1pxw  DEV_node-exporter.pdk3l24byngvyqdshvyobu35x  prom/node-exporter:v0.15.2  worker-1
+oakbqxk4p8go  DEV_node-exporter.kdndoqmjq4ovgyen7bjgqkh5n  prom/node-exporter:v0.15.2  master-1
+rtwd48j46lc5  DEV_node-exporter.09kmoxlvtrhzx75c3719plobm  prom/node-exporter:v0.15.2  worker-3
+53yduslwbhya  DEV_cadvisor.1                               google/cadvisor:v0.29.0     worker-1
+4705deb9uzp9  DEV_alertmanager.1                           frodox/alertmanager         master-1
+sgo6gi2ldpq4  DEV_prometheus.1                             frodox/prometheus           master-1
+gl2qvv0fkrs6  DEV_grafana.1                                grafana/grafana:5.0.0       worker-3
+8v23z8uz47yj  DEV_post.1                                   frodox/post:latest          worker-2
+i89r1txxmyrd  DEV_mongo.1                                  mongo:3.2                   master-1
+3mom8norwgph  DEV_comment.1                                frodox/comment:latest       worker-3
+t7194nkrid2e  DEV_ui.1                                     frodox/ui:latest            worker-2
+p66a0kf53f9x  DEV_post.2                                   frodox/post:latest          worker-1
+2orf6j5co7tv  DEV_comment.2                                frodox/comment:latest       worker-1
+8x1xybteqx8o  DEV_ui.2                                     frodox/ui:latest            worker-3
+vuiand8p6h98  DEV_post.3                                   frodox/post:latest          worker-3
+u1jncjfcam72  DEV_comment.3                                frodox/comment:latest       worker-2
+3cgwagw5eie0  DEV_ui.3                                     frodox/ui:latest            worker-1
 ```
 
 теперь на третем воркере добавился сервис `post`. Все предыдущие продолжают быть запущены.
@@ -773,3 +773,93 @@ $ curl --cacert ../kubernetes_the_hard_way/certs/ca.em https://${KUBERNETES_PUBL
 ```
 
 ### Bootstrapping the Kubernetes Worker Nodes
+
+```
+cd ansible
+ansible-playbook -v k8s-thw-workers.yml
+
+# Проверка
+gcloud compute ssh controller-0 --command "kubectl get nodes --kubeconfig admin.kubeconfig"
+
+kubecfrodox@controller-1:~$ kubectl get nodes
+NAME       STATUS    ROLES     AGE       VERSION
+worker-0   Ready     <none>    53s       v1.10.2
+worker-1   Ready     <none>    54s       v1.10.2
+worker-2   Ready     <none>    51s       v1.10.2
+```
+
+### Настройка kubectl для удалённого доступа
+
+* Настраиваем локальный kubeconfig для доступа к k8s в GCloud
+
+Проверка
+```
+kubectl get nodes
+```
+
+### Provisioning Pod Network Routes
+
+* Настраиваем по гайду.
+* Проверка:
+```
+gcloud compute routes list --filter "network: kubernetes-the-hard-way"
+
+NAME                                NETWORK                  DEST_RANGE     NEXT_HOP                  PRIORITY
+default-route-22e04d3521a7a799      kubernetes-the-hard-way  0.0.0.0/0      default-internet-gateway  1000 default-route-c5a01c0fdf69c863      kubernetes-the-hard-way  10.240.0.0/24                            1000
+kubernetes-route-10-200-0-0-24      kubernetes-the-hard-way  10.200.0.0/24  10.240.0.20               1000 kubernetes-route-10-200-1-0-24      kubernetes-the-hard-way  10.200.1.0/24  10.240.0.21               1000
+kubernetes-route-10-200-2-0-24      kubernetes-the-hard-way  10.200.2.0/24  10.240.0.22               1000
+```
+
+### Adding DNS add-on
+
+```
+ansible-playbook k8s-thw-dns-addon.yml
+
+kubectl run busybox --image=busybox --command -- sleep 3600
+# тестируесм DNS запрос изнутри конетйнера
+POD_NAME=$(kubectl get pods -l run=busybox -o jsonpath="{.items[0].metadata.name}")
+kubectl exec -ti $POD_NAME -- nslookup kubernetes
+```
+
+### Smoke test
+
+* шифрование
+* деплои
+* проброс портов
+* Логи контейнера
+* Exec
+* Сервисы
+* Ненадёжные источники
+
+### Создание своих деплойментов для сервиса reddit
+
+```
+kubectl apply -f comment-deployment.yml
+kubectl apply -f mongo-deployment.yml
+kubectl apply -f post-deployment.yml
+kubectl apply -f ui-deployment.yml
+
+
+frodox:.bin/ $ kubectl get pods                                         
+NAME                                 READY     STATUS    RESTARTS   AGE
+busybox-68654f944b-8hn6s             1/1       Running   0          29m
+comment-deployment-5f984959d-k2rf2   1/1       Running   0          2m
+comment-deployment-5f984959d-vbttz   1/1       Running   0          2m
+comment-deployment-5f984959d-vrrrt   1/1       Running   0          2m
+mongo-deployment-778dcd865b-7tqlq    1/1       Running   0          2m
+mongo-deployment-778dcd865b-87wbk    1/1       Running   0          2m
+mongo-deployment-778dcd865b-twkpv    1/1       Running   0          2m
+nginx-65899c769f-c2rp9               1/1       Running   0          13m
+post-deployment-8476bcc7d-2hzl6      1/1       Running   0          2m
+ui-deployment-849d948776-4ck44       1/1       Running   0          2m
+ui-deployment-849d948776-r79lr       1/1       Running   0          2m
+ui-deployment-849d948776-s9mqg       1/1       Running   0          2m
+untrusted                            1/1       Running   0          8m
+```
+
+### Удаление всего кластера
+
+* виртуальные машины
+* сетевые пулы
+* файрволы
+* network VPC
