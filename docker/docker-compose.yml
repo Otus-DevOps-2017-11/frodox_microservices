@@ -18,15 +18,33 @@ services:
       - ${UI_PORT}:9292/tcp
     networks:
       front_net:
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: service.ui
+
 
   post:
-    image: ${USER_NAME}/post:${POST_VERSION}
-    restart: always
+    image: ${USER_NAME}/post:latest
+    environment:
+      - POST_DATABASE_HOST=post_db
+      - POST_DATABASE=posts
+    depends_on:
+      - post_db
+    ports:
+      - "5000:5000"
     networks:
       back_net:
       front_net:
         aliases:
           - post
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: localhost:24224
+        tag: service.post
+
 
   comment:
     image: ${USER_NAME}/comment:${COMMENT_VERSION}

@@ -243,7 +243,7 @@ docker build -t $USER_NAME/prometheus .
 for i in ui post-py comment; 
 do
     pushd src/$i
-    bash ./docker_build.sh & || echo "ERROR" >&2
+    (bash ./docker_build.sh || echo "ERROR" >&2) &
     popd
 done
 wait
@@ -306,7 +306,7 @@ eval $(~/opt/docker-machine-0.13 env vm1)
 for i in ui post-py comment; 
 do
     pushd src/$i
-    bash ./docker_build.sh & || echo "ERROR" >&2
+    (bash ./docker_build.sh || echo "ERROR" >&2) &
     popd
 done
 wait
@@ -332,3 +332,45 @@ done
 ```
 
 Ссылка: https://hub.docker.com/u/frodox/
+
+
+## Homework #25 (Logging & Tracing)
+
+В ходе домашней работы:
+* Настроен сбор логов
+* Работа со структурированными логами
+* Работа с неструктурированными логами
+* Распределённая трасировка приложений
+
+Ход работ:
+
+* Создание новой тачки и открытие доп.портов
+```
+export GOOGLE_PROJECT=$(cat gcp.id)
+~/opt/docker-machine-0.13 create --driver google \
+    --google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
+    --google-machine-type n1-standard-1 \
+    --google-open-port 5000/tcp \
+    --google-open-port 5601/tcp \
+    --google-open-port 9292/tcp \
+    --google-open-port 9411/tcp \
+    logging
+
+eval $(~/opt/docker-machine-0.13 env vm2)
+
+gcloud compute firewall-rules create zipkin-default --allow tcp:9411
+gcloud compute firewall-rules create alertmanager-default --allow tcp:9411
+```
+
+* Обновлён исходный код в каталоге `/src`
+* Сборка новых версий всех образов:
+```
+for i in ui post-py comment; 
+do
+    pushd src/$i
+    (bash ./docker_build.sh || echo "ERROR building $i" >&2) &
+    popd
+done
+wait
+```
+

@@ -5,6 +5,7 @@ ENV POST_DATABASE posts
 
 WORKDIR /app
 
+RUN apk add --no-cache gcc musl-dev
 COPY requirements.txt .
 RUN pip install -r /app/requirements.txt
 
