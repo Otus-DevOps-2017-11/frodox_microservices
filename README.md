@@ -957,5 +957,13 @@ gcloud compute disks create --size=25GB --zone=europe-west2-c reddit-mongo-disk
   * Шаблонизируем и учимся деплоить несколько инстансов
   * Перезаписываем значения в зависимых чартах
 * Развёртывание GitLab в k8s
+  * Подготовка кластера - увеличение мощностей
+  * Отключение RBAC -> Legacy Authorization
+  * добавляем helm репу гитлаба
+```
+helm repo add gitlab https://charts.gitlab.io
+helm fetch gitlab/gitlab-omnibus --version 0.1.37 --untarar
+```
+
 * Запуск CI/CD pipeline в k8s
 
