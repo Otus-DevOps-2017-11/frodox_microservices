@@ -8,12 +8,11 @@ metadata:
     component: ui
 
 spec:
-  type: NodePort
+  type: LoadBalancer # только для облачных шняг, аля AWS, GCP
   ports:
-    - port: 9292       # порт, для доступа к сервису изнутри k8s
-      nodePort: 32092  # порт, для доступа к сервису снаружи кластера
+    - port: 80       # порт на балансировщике
       protocol: TCP
-      targetPort: 9292
+      targetPort: 9292 # порт POD-а
   selector:
     app: reddit
     component: ui

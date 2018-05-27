@@ -908,3 +908,16 @@ done
 * Деплоим наш неймспейс и приложение
 * Ссылка на [скриншот веб-интерфейса](http://i.imgur.com/VfWcrG6.png)
 * Дашборд если включить, по токену сейчас входит нормально (версия 1.10)
+
+
+## Homework 30 (Kubernetes-3)
+
+* При отключении kube-dns --- имена перестают резолвится
+* Настраиваем GCP-ный LB для сервиса ui. Смотрим, что получилось:
+```
+(kubernetes-3⚡) » kubectl get service -n dev --selector component=ui
+NAME      TYPE           CLUSTER-IP     EXTERNAL-IP      PORT(S) 
+ui        LoadBalancer   10.3.246.148   35.234.147.157   80:30153/TCP
+```
+
+
