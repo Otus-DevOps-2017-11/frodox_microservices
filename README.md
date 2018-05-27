@@ -920,4 +920,22 @@ NAME      TYPE           CLUSTER-IP     EXTERNAL-IP      PORT(S)
 ui        LoadBalancer   10.3.246.148   35.234.147.157   80:30153/TCP
 ```
 
+здорово, но есть проблемы с гибкость, невозможностью балансировки L7, и только для облаков.
 
+* Создаём k8s ингресс
+* Создаём tls, используя IP
+```
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout tls.key -out tls.crt -subj "/CN=35.227.199.112"
+
+kubectl create secret tls ui-ingress --key tls.key --cert tls.crt -n dev
+kubectl describe secret ui-ingress -n dev
+```
+
+* Правим ui-ingress, применяем. Спустя 5-10 минут конфигурация применяется
+* Включаем NEtworkPolicy
+```
+cluster-1  europe-west2-c  1.8.10-gke.0    35.230.132.200  g1-small      1.8.10-gke.0  2    RUNNING
+
+gcloud beta container clusters update cluster-1 --zone=europe-west2-c --update-addons=NetworkPolicy=ENABLED
+gcloud beta container clusters update cluster-1 --zone=europe-west2-c  --enable-network-policy
+```
