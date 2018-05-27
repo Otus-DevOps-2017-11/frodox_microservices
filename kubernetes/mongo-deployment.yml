@@ -35,4 +35,5 @@ spec:
 
       volumes:
         - name: mongo-persistent-storage
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: mongo-pvc-dynamic

@@ -939,3 +939,10 @@ cluster-1  europe-west2-c  1.8.10-gke.0    35.230.132.200  g1-small      1.8.10-
 gcloud beta container clusters update cluster-1 --zone=europe-west2-c --update-addons=NetworkPolicy=ENABLED
 gcloud beta container clusters update cluster-1 --zone=europe-west2-c  --enable-network-policy
 ```
+
+* Разграничиваем доступ, чтобы к БД могли ходить только post,comment
+* При удалении деплоя mongo удаляются все сообщения, т.к. вместе с Pod удаляется и volume-emptyDir. Пора использовать что-то внешнее
+```
+gcloud compute disks create --size=25GB --zone=europe-west2-c reddit-mongo-disk
+```
+* Пробуем PV, PVC, PVC-Dynamic
