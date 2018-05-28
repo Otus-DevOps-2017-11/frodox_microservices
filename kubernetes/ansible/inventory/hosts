@@ -1,0 +1,12 @@
+[controllers]
+controller-0
+controller-1
+controller-2
+
+[workers]
+worker-0
+worker-1
+worker-2
+
+[all:vars]
+ansible_python_interpreter=/usr/bin/python3

@@ -1,0 +1,188 @@
+- name: Bootstrapping Control Plane
+  hosts: controllers
+  vars:
+    etcd_version: v3.3.5
+  become: true
+  tasks:
+    - name: create k8s dirs
+      file:
+        path: "{{ item }}"
+        state: directory
+      with_items:
+        - /etc/kubernetes/config
+        - /var/lib/kubernetes
+
+    - name: Download binaries
+      get_url:
+        url: "https://storage.googleapis.com/kubernetes-release/release/v1.10.2/bin/linux/amd64/{{ item }}"
+        dest: /usr/local/bin/{{ item }}
+        mode: 0755
+      with_items:
+        - kube-apiserver
+        - kube-controller-manager
+        - kube-scheduler
+        - kubectl
+
+    - name: Upload certs and configs
+      copy:
+        src: ../kubernetes_the_hard_way/certs/{{ item }}
+        dest: /var/lib/kubernetes/{{ item }}
+      become: true
+      with_items:
+        - ca.pem
+        - ca-key.pem
+        - kubernetes.pem
+        - kubernetes-key.pem
+        - service-account.pem
+        - service-account-key.pem
+        - encryption-config.yaml
+        - kube-controller-manager.kubeconfig
+        - kube-scheduler.kubeconfig
+
+    - name: Get node internal ip
+      uri:
+        url: http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip
+        method: GET
+        return_content: true
+        headers:
+          Metadata-Flavor: "Google"
+      register: gce_ip
+
+    - set_fact:
+        internal_ip: "{{ gce_ip.content }}"
+
+    - name: Create kube-scheduler config
+      copy:
+        dest: /etc/kubernetes/config/kube-scheduler.yaml
+        content: |
+          apiVersion: componentconfig/v1alpha1
+          kind: KubeSchedulerConfiguration
+          clientConnection:
+            kubeconfig: "/var/lib/kubernetes/kube-scheduler.kubeconfig"
+          leaderElection:
+            leaderElect: true
+
+    - name: Create systemd-services
+      template:
+        src: "{{ item.src }}"
+        dest: /etc/systemd/system/{{ item.dest }}
+      become: true
+      with_items:
+        - { src: kube-apiserver.service.j2, dest: kube-apiserver.service }
+        - { src: kube-controller-manager.service.j2, dest: kube-controller-manager.service }
+        - { src: kube-scheduler.service.j2, dest: kube-scheduler.service }
+
+    - name: start systemd service
+      systemd:
+        name: "{{ item }}"
+        daemon_reload: true
+        state: started
+        enabled: true
+      become: yes
+      with_items:
+        - kube-apiserver
+        - kube-controller-manager
+        - kube-scheduler
+
+    # ------------------------------------------ #
+
+    - name: Install nginx
+      apt:
+        name: nginx
+        state: present
+
+    - name: Create nginx-config for healthz-checks
+      copy:
+        dest: /etc/nginx/sites-enabled/kubernetes.default.svc.cluster.local
+        content: |
+          server {
+            listen      80;
+            server_name kubernetes.default.svc.cluster.local;
+
+            location /healthz {
+              proxy_pass                    https://127.0.0.1:6443/healthz;
+              proxy_ssl_trusted_certificate /var/lib/kubernetes/ca.pem;
+            }
+          }
+    
+    - name: Restart and enable nginx
+      systemd:
+        name: "{{ item }}"
+        daemon_reload: true
+        state: restarted
+        enabled: true
+      become: yes
+      with_items:
+        - nginx
+
+    - name: verification kubeconfig
+      shell: kubectl get componentstatuses --kubeconfig admin.kubeconfig
+      register: test_kubectl
+
+    - debug:
+        var: test_kubectl.stdout_lines
+
+    - name: verification nginx healthz
+      uri:
+        url: http://127.0.0.1/healthz
+        method: GET
+        return_content: true
+        headers:
+          Host: kubernetes.default.svc.cluster.local
+
+
+    # --- RBAC --- #
+
+    - name: rbac - create config
+      copy:
+        dest: ./rbac-create.yml
+        content: |
+          apiVersion: rbac.authorization.k8s.io/v1beta1
+          kind: ClusterRole
+          metadata:
+            annotations:
+              rbac.authorization.kubernetes.io/autoupdate: "true"
+            labels:
+              kubernetes.io/bootstrapping: rbac-defaults
+            name: system:kube-apiserver-to-kubelet
+          rules:
+            - apiGroups:
+                - ""
+              resources:
+                - nodes/proxy
+                - nodes/stats
+                - nodes/log
+                - nodes/spec
+                - nodes/metrics
+              verbs:
+                - "*"
+      tags: rbac
+
+    - name: rbac - bind config
+      copy:
+        dest: ./rbac-bind.yml
+        content: |
+          apiVersion: rbac.authorization.k8s.io/v1beta1
+          kind: ClusterRoleBinding
+          metadata:
+            name: system:kube-apiserver
+            namespace: ""
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: system:kube-apiserver-to-kubelet
+          subjects:
+            - apiGroup: rbac.authorization.k8s.io
+              kind: User
+              name: kubernetes
+      tags: rbac
+
+    - name: apply rbac configs
+      shell: kubectl apply --kubeconfig admin.kubeconfig -f {{ item }}
+      with_items:
+        - rbac-create.yml
+        - rbac-bind.yml
+      tags: rbac
+
+
+

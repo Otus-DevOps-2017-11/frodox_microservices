@@ -506,24 +506,24 @@ p66a0kf53f9x  DEV_post.2                                   frodox/post:latest   
 Увеличиваем в конфиге число реплик до трёх, запускаем, смотрим:
 ```
 ➜  docker (swarm-1) docker stack ps DEV
-lhekvyex0g0h  DEV_node-exporter.wtg17ff84v6k38h63l8q2rwsh  prom/node-exporter:v0.15.2  worker-2 
-3trjbxcl1pxw  DEV_node-exporter.pdk3l24byngvyqdshvyobu35x  prom/node-exporter:v0.15.2  worker-1 
-oakbqxk4p8go  DEV_node-exporter.kdndoqmjq4ovgyen7bjgqkh5n  prom/node-exporter:v0.15.2  master-1 
-rtwd48j46lc5  DEV_node-exporter.09kmoxlvtrhzx75c3719plobm  prom/node-exporter:v0.15.2  worker-3 
-53yduslwbhya  DEV_cadvisor.1                               google/cadvisor:v0.29.0     worker-1 
-4705deb9uzp9  DEV_alertmanager.1                           frodox/alertmanager         master-1 
-sgo6gi2ldpq4  DEV_prometheus.1                             frodox/prometheus           master-1 
-gl2qvv0fkrs6  DEV_grafana.1                                grafana/grafana:5.0.0       worker-3 
-8v23z8uz47yj  DEV_post.1                                   frodox/post:latest          worker-2 
-i89r1txxmyrd  DEV_mongo.1                                  mongo:3.2                   master-1 
-3mom8norwgph  DEV_comment.1                                frodox/comment:latest       worker-3 
-t7194nkrid2e  DEV_ui.1                                     frodox/ui:latest            worker-2 
-p66a0kf53f9x  DEV_post.2                                   frodox/post:latest          worker-1 
-2orf6j5co7tv  DEV_comment.2                                frodox/comment:latest       worker-1 
-8x1xybteqx8o  DEV_ui.2                                     frodox/ui:latest            worker-3 
-vuiand8p6h98  DEV_post.3                                   frodox/post:latest          worker-3 
-u1jncjfcam72  DEV_comment.3                                frodox/comment:latest       worker-2 
-3cgwagw5eie0  DEV_ui.3                                     frodox/ui:latest            worker-1 
+lhekvyex0g0h  DEV_node-exporter.wtg17ff84v6k38h63l8q2rwsh  prom/node-exporter:v0.15.2  worker-2
+3trjbxcl1pxw  DEV_node-exporter.pdk3l24byngvyqdshvyobu35x  prom/node-exporter:v0.15.2  worker-1
+oakbqxk4p8go  DEV_node-exporter.kdndoqmjq4ovgyen7bjgqkh5n  prom/node-exporter:v0.15.2  master-1
+rtwd48j46lc5  DEV_node-exporter.09kmoxlvtrhzx75c3719plobm  prom/node-exporter:v0.15.2  worker-3
+53yduslwbhya  DEV_cadvisor.1                               google/cadvisor:v0.29.0     worker-1
+4705deb9uzp9  DEV_alertmanager.1                           frodox/alertmanager         master-1
+sgo6gi2ldpq4  DEV_prometheus.1                             frodox/prometheus           master-1
+gl2qvv0fkrs6  DEV_grafana.1                                grafana/grafana:5.0.0       worker-3
+8v23z8uz47yj  DEV_post.1                                   frodox/post:latest          worker-2
+i89r1txxmyrd  DEV_mongo.1                                  mongo:3.2                   master-1
+3mom8norwgph  DEV_comment.1                                frodox/comment:latest       worker-3
+t7194nkrid2e  DEV_ui.1                                     frodox/ui:latest            worker-2
+p66a0kf53f9x  DEV_post.2                                   frodox/post:latest          worker-1
+2orf6j5co7tv  DEV_comment.2                                frodox/comment:latest       worker-1
+8x1xybteqx8o  DEV_ui.2                                     frodox/ui:latest            worker-3
+vuiand8p6h98  DEV_post.3                                   frodox/post:latest          worker-3
+u1jncjfcam72  DEV_comment.3                                frodox/comment:latest       worker-2
+3cgwagw5eie0  DEV_ui.3                                     frodox/ui:latest            worker-1
 ```
 
 теперь на третем воркере добавился сервис `post`. Все предыдущие продолжают быть запущены.
@@ -536,3 +536,330 @@ u1jncjfcam72  DEV_comment.3                                frodox/comment:latest
 ```
 docker stack deploy --compose-file=<(docker-compose -f docker-compose-swarm.yml -f docker-compose.monitoring.yml config 2>/dev/null) DEV
 ```
+
+## Homework #28 (Kubernetes. The Hard Way)
+
+[Стартуем туториал](https://github.com/kelseyhightower/kubernetes-the-hard-way) . Labs
+
+### Подготовка
+
+* ansible setup GCE ([based on](http://docs.ansible.com/ansible/devel/scenario_guides/guide_gce.html))
+** [Создаём сервисную учётку GCE](https://console.cloud.google.com/iam-admin/serviceaccounts/project?project=docker-196320&authuser=1)
+** Качаем от учётки JSON ключ доступа. Почту
+** Ставим зависимости
+```
+# pip install apache-libcloud
+
+export GCE_INI_PATH=$(pwd)/kubernetes/ansible/inventory/gce.ini
+```
+** в каталоге ansible/inventory используем gce.ini/py из офф.репы ansible
+** фиксим поля `gce_*` в файле `gce.ini`
+
+* установка и логин GCloud SDK, tmux
+```
+# set default region
+gcloud config set compute/region europe-west2
+```
+* установка cfssl, cfssljson
+* установка kubectl
+
+#### Настройка GCloud окружения
+
+* Настройка сети и firewall
+```
+# VPC и подсеть
+gcloud compute networks create kubernetes-the-hard-way --subnet-mode custom
+gcloud compute networks subnets create kubernetes \
+  --network kubernetes-the-hard-way \
+  --range 10.240.0.0/24
+
+# firewall
+## internal
+gcloud compute networks subnets create kubernetes \
+  --network kubernetes-the-hard-way \
+  --range 10.240.0.0/24
+
+## external
+gcloud compute networks subnets create kubernetes \
+  --network kubernetes-the-hard-way \
+  --range 10.240.0.0/24
+
+## show rules
+gcloud compute firewall-rules list --filter="network:kubernetes-the-hard-way"
+```
+
+* Создаём статический внешний IP для LB
+```
+gcloud compute addresses create kubernetes-the-hard-way \
+  --region $(gcloud config get-value compute/region)
+
+# убеждаемся что всё ок
+gcloud compute addresses list --filter="name=('kubernetes-the-hard-way')"
+```
+
+* Создание 3 compute instances для k8s контроллеров
+```
+# выбираем зону europe-west2-c (21)
+for i in 0 1 2; do
+  gcloud compute instances create controller-${i} \
+    --async \
+    --boot-disk-size 200GB \
+    --can-ip-forward \
+    --image-family ubuntu-1804-lts \
+    --image-project ubuntu-os-cloud \
+    --machine-type n1-standard-1 \
+    --private-network-ip 10.240.0.1${i} \
+    --scopes compute-rw,storage-ro,service-management,service-control,logging-write,monitoring \
+    --subnet kubernetes \
+    --tags kubernetes-the-hard-way,controller
+done
+```
+
+* Создаём 3 инстанса для воркеров
+```
+for i in 0 1 2; do
+  gcloud compute instances create worker-${i} \
+    --async \
+    --boot-disk-size 200GB \
+    --can-ip-forward \
+    --image-family ubuntu-1804-lts \
+    --image-project ubuntu-os-cloud \
+    --machine-type n1-standard-1 \
+    --metadata pod-cidr=10.200.${i}.0/24 \
+    --private-network-ip 10.240.0.2${i} \
+    --scopes compute-rw,storage-ro,service-management,service-control,logging-write,monitoring \
+    --subnet kubernetes \
+    --tags kubernetes-the-hard-way,worker \
+    --zone europe-west2-c
+done
+
+# проверяем результат
+gcloud compute instances list
+```
+
+* Настройка SSH-доступа
+
+```
+gcloud compute ssh controller-0
+```
+
+#### Создание CA и генерация TLS сертификатов
+
+* Создание CA
+```
+cfssl gencert -initca ca-csr.json | cfssljson -bare ca
+> ca-key.pem
+> ca.pem
+```
+
+* Создание клиентских и серверных сертификатов
+** `admin` клиентский сертификат
+```
+cfssl gencert \
+  -ca=ca.pem \
+  -ca-key=ca-key.pem \
+  -config=ca-config.json \
+  -profile=kubernetes \
+  admin-csr.json | cfssljson -bare admin
+
+> admin-key.pem
+> admin.pem
+```
+
+** `kubelet` клиентский сертификат и приватный ключ
+
+Result: `worker-{0,2}.pem`, `worker-{0,2}-key.pem`
+
+** `kube-controller-manager` клиентский сертификат и приватный ключ
+
+Result: `kube-controller-manager.pem`, `kube-controller-manager-key.pem`
+
+** `kube-proxy` клиентский сертификат и приватный ключ
+
+Result: `kube-proxy.pem`, `kube-proxy-key.pem`
+
+** `kube-scheduler` клиентский сертификат и приватный ключ
+
+Result: `kube-scheduler.pem`, `kube-scheduler-key.pem`
+
+** `kube-api-server` клиентский сертификат и приватный ключ
+
+Result: `kubernetes.pem`, `kubernetes-key.pem`
+
+** `service-account` клиентский сертификат и приватный ключ
+
+Result: `service-account.pem`, `service-account-key.pem`
+
+* Распространяем ключи по соответствующим нодам:
+
+```
+# по воркерам
+for instance in worker-0 worker-1 worker-2; do
+  gcloud compute scp ca.pem ${instance}-key.pem ${instance}.pem ${instance}:~/
+done
+
+# по контроллерам
+for instance in controller-0 controller-1 controller-2; do
+  gcloud compute scp ca.pem ca-key.pem kubernetes-key.pem kubernetes.pem \
+    service-account-key.pem service-account.pem ${instance}:~/
+done
+```
+
+#### Создание kubernetes конфигов для аутентификации
+
+* Конфиги для воркеров `worker-{0,2}.kubeconfig`
+* Конфиг для `kube-proxy` --- `kube-proxy.kubeconfig`
+* Конфиг для `kube-controller-manager` --- `kube-controller-manager.kubeconfig`
+* Конфиг для `kube-scheduler` --- `kube-scheduler.kubeconfig`
+* Конфиг для user `admin` --- `admin..kubeconfig`
+* Распространяем конфиги
+```
+# для воркеров
+for instance in worker-0 worker-1 worker-2; do
+  gcloud compute scp ${instance}.kubeconfig kube-proxy.kubeconfig ${instance}:~/
+done
+
+# для контроллеров
+for instance in controller-0 controller-1 controller-2; do
+  gcloud compute scp admin.kubeconfig kube-controller-manager.kubeconfig kube-scheduler.kubeconfig ${instance}:~/
+done
+```
+
+#### Создание конфига и ключа для шифрования данных
+
+* Создание ключа шифрования из `/dev/urandom`
+* Создание конфига шифрования
+* Распространяем конфиг по контроллерам
+```
+for instance in controller-0 controller-1 controller-2; do
+  gcloud compute scp encryption-config.yaml ${instance}:~/
+done
+```
+
+### Поднятие кластера etcd
+
+```
+cd ansible
+ansible-playbook k8s-thw-etcd.yml
+```
+
+### Bootstrapping the Kubernetes Control Plane
+
+```
+cd ansible
+ansible-playbook -v k8s-thw-control-plane.yml
+```
+
+* Вручную настраиваем k8s FrontEnd LoadBalancer с хоста
+* Проверка, что всё OK
+```
+$ KUBERNETES_PUBLIC_ADDRESS=$(gcloud compute addresses describe kubernetes-the-hard-way \
+  --region $(gcloud config get-value compute/region) \
+  --format 'value(address)')
+
+$ curl --cacert ../kubernetes_the_hard_way/certs/ca.em https://${KUBERNETES_PUBLIC_ADDRESS}:6443/version
+
+{
+  "major": "1",
+  "minor": "10",
+  "gitVersion": "v1.10.2",
+  "gitCommit": "81753b10df112992bf51bbc2c2f85208aad78335",
+  "gitTreeState": "clean",
+  "buildDate": "2018-04-27T09:10:24Z",
+  "goVersion": "go1.9.3",
+  "compiler": "gc",
+  "platform": "linux/amd64"
+}
+```
+
+### Bootstrapping the Kubernetes Worker Nodes
+
+```
+cd ansible
+ansible-playbook -v k8s-thw-workers.yml
+
+# Проверка
+gcloud compute ssh controller-0 --command "kubectl get nodes --kubeconfig admin.kubeconfig"
+
+kubecfrodox@controller-1:~$ kubectl get nodes
+NAME       STATUS    ROLES     AGE       VERSION
+worker-0   Ready     <none>    53s       v1.10.2
+worker-1   Ready     <none>    54s       v1.10.2
+worker-2   Ready     <none>    51s       v1.10.2
+```
+
+### Настройка kubectl для удалённого доступа
+
+* Настраиваем локальный kubeconfig для доступа к k8s в GCloud
+
+Проверка
+```
+kubectl get nodes
+```
+
+### Provisioning Pod Network Routes
+
+* Настраиваем по гайду.
+* Проверка:
+```
+gcloud compute routes list --filter "network: kubernetes-the-hard-way"
+
+NAME                                NETWORK                  DEST_RANGE     NEXT_HOP                  PRIORITY
+default-route-22e04d3521a7a799      kubernetes-the-hard-way  0.0.0.0/0      default-internet-gateway  1000 default-route-c5a01c0fdf69c863      kubernetes-the-hard-way  10.240.0.0/24                            1000
+kubernetes-route-10-200-0-0-24      kubernetes-the-hard-way  10.200.0.0/24  10.240.0.20               1000 kubernetes-route-10-200-1-0-24      kubernetes-the-hard-way  10.200.1.0/24  10.240.0.21               1000
+kubernetes-route-10-200-2-0-24      kubernetes-the-hard-way  10.200.2.0/24  10.240.0.22               1000
+```
+
+### Adding DNS add-on
+
+```
+ansible-playbook k8s-thw-dns-addon.yml
+
+kubectl run busybox --image=busybox --command -- sleep 3600
+# тестируесм DNS запрос изнутри конетйнера
+POD_NAME=$(kubectl get pods -l run=busybox -o jsonpath="{.items[0].metadata.name}")
+kubectl exec -ti $POD_NAME -- nslookup kubernetes
+```
+
+### Smoke test
+
+* шифрование
+* деплои
+* проброс портов
+* Логи контейнера
+* Exec
+* Сервисы
+* Ненадёжные источники
+
+### Создание своих деплойментов для сервиса reddit
+
+```
+kubectl apply -f comment-deployment.yml
+kubectl apply -f mongo-deployment.yml
+kubectl apply -f post-deployment.yml
+kubectl apply -f ui-deployment.yml
+
+
+frodox:.bin/ $ kubectl get pods                                         
+NAME                                 READY     STATUS    RESTARTS   AGE
+busybox-68654f944b-8hn6s             1/1       Running   0          29m
+comment-deployment-5f984959d-k2rf2   1/1       Running   0          2m
+comment-deployment-5f984959d-vbttz   1/1       Running   0          2m
+comment-deployment-5f984959d-vrrrt   1/1       Running   0          2m
+mongo-deployment-778dcd865b-7tqlq    1/1       Running   0          2m
+mongo-deployment-778dcd865b-87wbk    1/1       Running   0          2m
+mongo-deployment-778dcd865b-twkpv    1/1       Running   0          2m
+nginx-65899c769f-c2rp9               1/1       Running   0          13m
+post-deployment-8476bcc7d-2hzl6      1/1       Running   0          2m
+ui-deployment-849d948776-4ck44       1/1       Running   0          2m
+ui-deployment-849d948776-r79lr       1/1       Running   0          2m
+ui-deployment-849d948776-s9mqg       1/1       Running   0          2m
+untrusted                            1/1       Running   0          8m
+```
+
+### Удаление всего кластера
+
+* виртуальные машины
+* сетевые пулы
+* файрволы
+* network VPC
