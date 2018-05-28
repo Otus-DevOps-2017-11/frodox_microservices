@@ -1,9 +1,8 @@
 ---
-version: '3.3'
+version: '3'
 services:
   prometheus:
     image: ${USER_NAME}/prometheus
-    restart: always
     networks:
       back_net:
       front_net:
@@ -18,6 +17,8 @@ services:
 
   node-exporter:
     image: prom/node-exporter:v0.15.2
+    deploy:
+      mode: global
     user: root
     networks:
       back_net:
