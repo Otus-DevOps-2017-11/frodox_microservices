@@ -966,4 +966,5 @@ helm fetch gitlab/gitlab-omnibus --version 0.1.37 --untarar
 ```
 
 * Запуск CI/CD pipeline в k8s
+  * настариваем `.gitlab-ci.yml` в репах для деплоя на окружения
 

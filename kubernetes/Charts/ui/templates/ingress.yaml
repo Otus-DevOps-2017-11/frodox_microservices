@@ -4,10 +4,11 @@ kind: Ingress
 metadata:
   name: {{ template "ui.fullname" . }}
   annotations:
-    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.class: {{ .Values.ingress.class }}
 spec:
   rules:
-  - http:
+  - host: {{ .Values.ingress.host | default .Release.Name }}
+    http:
       paths:
       - path: /
         backend:
