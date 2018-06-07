@@ -863,3 +863,48 @@ untrusted                            1/1       Running   0          8m
 * сетевые пулы
 * файрволы
 * network VPC
+
+
+## Homework-29 (Kubernetes-2)
+
+### Подготовка локального окружения для работы с k8s
+
+Качаем, ставим
+* `kubectl`
+* minikube
+* VirtualBox
+
+Стартум кластер:
+```
+minikube start
+kubectl get nodes
+```
+
+Кофнигурация kubectl --- контекст:
+* cluster (API-сервер)
+* user (для подключения к кластеру)
+* namespace (область видимости. Если нет - `default`)
+
+Запускаем деплоймент UI
+```
+kubectl apply -f ui-deployment.yml 
+# проброс портов POD-а напрямую, для теста
+kubectl port-forward ui-deployment-57b5c88f5-2tr7s 8080:9292
+```
+
+* Настраиваем ui, post, commnet, чтобы видели друг друга (сервисы и env)
+* Настроим в minikube - k8s dashboard
+* Запуск в определённом namespace:
+```
+for l in $(ls *.yml); do        
+  kubectl apply -f $l -n dev;
+done
+```
+
+### Переезжаем в GKE
+
+* Создаём кластер в GKE с заданными параметрами
+* Подключаемся к нему (настройка контекста)
+* Деплоим наш неймспейс и приложение
+* Ссылка на [скриншот веб-интерфейса](http://i.imgur.com/VfWcrG6.png)
+* Дашборд если включить, по токену сейчас входит нормально (версия 1.10)
