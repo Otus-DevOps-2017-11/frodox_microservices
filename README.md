@@ -996,3 +996,7 @@ helm upgrade --install prom . -f custom_values.yml
 helm upgrade --install grafana ./grafana -f ./grafana/custom.yml
 ```
 * Настраиваем дашборды
+* Ставим EFK-стек
+```
+kubectl apply -f ./efk
+```
