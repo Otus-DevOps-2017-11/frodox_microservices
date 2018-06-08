@@ -968,3 +968,31 @@ helm fetch gitlab/gitlab-omnibus --version 0.1.37 --untarar
 * Запуск CI/CD pipeline в k8s
   * настариваем `.gitlab-ci.yml` в репах для деплоя на окружения
 
+
+## Homework-32 (Kubernetes, Prometheus, Grafana, EFK)
+
+* Мониторинг в k8s
+* Логирование в k8s
+
+---
+
+* Устанавливаем ingress-контроллер
+* Устанавливаем Prometheus
+```
+# версия Prometheus 2.2.1 уже в офф.репах
+helm fetch --untar stable/prometheus
+
+# cd prometheus
+# создаём файл custom_values
+helm upgrade --install prom . -f custom_values.yml
+
+# проверяем http://reddit-prometheus/graph
+```
+* включаем node-exportater, kube-system
+* Деплоим наши сервисы reddit
+* Настраиваем в custom_values отдельные группы для каждого компонента
+* Ставим Grafana
+```
+helm upgrade --install grafana ./grafana -f ./grafana/custom.yml
+```
+* Настраиваем дашборды
